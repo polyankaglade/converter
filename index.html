@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+	<link rel="manifest" href="manifest.json" />
+	<meta name="viewport" content="width=device-width, user-scalable=no">
+    <title>Converter</title>
+	<!--<link rel="stylesheet" href="https://codepen.io/gymratpacks/pen/VKzBEp#0">-->
+	<link rel='stylesheet' href='https://fonts.googleapis.com/css?family=Nunito:400,300' type='text/css'>
+	<link rel="stylesheet" href="style.css">
+	
+	<link rel="apple-touch-icon" href="icons/icon-64x64.png" />
+	<link rel="apple-touch-icon" href="icons/icon-128x128.png" />
+	<link rel="apple-touch-icon" href="icons/icon-512x512.png" />
+	
+	<style>
+	#loading-container {
+	  position: fixed;
+	  top: 0;
+	  left: 0;
+	  width: 100%;
+	  height: 100%;
+	  background-color: rgba(0, 0, 0, 0.75);
+	  z-index: 9999;
+	  display: flex;
+	  flex-direction: column;
+	  justify-content: center;
+	  align-items: center;
+		}
+
+	#loading-message, #loading-log {
+	  font-size: 24px;
+	  color: #ffffff;
+	  margin-right: 20px;
+	}
+
+	#loading-log {
+	  margin-right: 0px;
+	  padding: 20px 100px;
+	  color: #b0b0b0;
+	}
+	</style>
+	
+  </head>
+  <body onload="Loading()">
+  
+	<div id="loading-container">
+	  <div id="loading-message">Loading rates</div>
+	  <div id="loading-log">...</div>
+	</div>
+
+	
+	<div class="row">
+    <div class="col-md-12">
+	<form>
+	
+	<h1> Конвертер </h1>
+	<fieldset>
+		<legend>Комиссия Сбер: <span id="comission">1</span>%</legend>
+		<legend>RUB → BYN (Технобанк) = <span id="RubByn"></span></legend>
+		<legend>RUB -> BYN (МИР)       = <span id="MIR"></span></legend>
+		<legend>BYN → EUR (Приорбанк) = <span id="BynEur"></span></legend>
+	</fieldset>
+	
+	<fieldset>
+		<input type="checkbox" id="addition" value="checked" onchange="updateRate()">
+		<label class="light">Учитывать доначисление</label>
+	</fieldset>
+    <fieldset>
+      <label>RUB:</label>
+      <input type="number" id="rub" oninput="updateCurr('rub')">
+	  <label>с комиссией: <span id="with-comission">0</span> RUB</label>
+	  
+      <label>BYN:</label>
+      <input type="number" id="byn" oninput="updateCurr('byn')">
+	  
+      <label>EUR:</label>
+      <input type="number" id="eur" oninput="updateCurr('eur')">
+    </fieldset>
+	<fieldset>
+		<legend>Итоговый курс RUB → EUR: <span id="final-rate"></span></legend>
+	</fieldset>
+	</form>
+	</div>
+	</div>
+	
+    <script>
+	
+	let EurByn = 1.0;
+	let RubByn = 1.0;
+	let MIR = 1.0;
+	
+	
+	let rateRubByn = RubByn;
+	let BynEur = 1.0 / EurByn;
+	
+	let rateRubEur = 1.0;
+	
+	const comission = parseFloat(document.getElementById("comission").innerText) / 100.0;
+
+	
+	let lastEntered = "none";
+	
+	
+
+	
+	async function getExchangeRate(url, rowN, columnN) {
+		try {
+			const response = await fetch(url);
+			const data = await response.text();
+			const parser = new DOMParser();
+			const doc = parser.parseFromString(data, 'text/html');
+			const tables = doc.querySelectorAll('table');
+			const table = tables[0]; // select the first table
+			const row = table.querySelectorAll('tr')[rowN]; // select the third row
+			const cell = row.querySelectorAll('td')[columnN]; // select the third cell
+			const value = parseFloat(cell.textContent.trim());
+			console.log(value); // Output the resulting value to the console
+			return value
+		} catch (error) {
+			console.error(error);
+		}
+	}
+
+	
+	
+	async function getRates() {
+
+	
+		console.log("loading rates");
+		
+		
+		const urlP = `https://api.allorigins.win/get?url=${encodeURIComponent('http://myfin.by/bank/priorbank/currency')}`;
+		document.getElementById("loading-log").innerText = "fetching " + urlP;
+		const rowP = 2;
+		const columnP = 2;
+		
+		let euby = await getExchangeRate(urlP, rowP, columnP);
+		EurByn = euby;
+		console.log(`Приорбанк rate is ${EurByn}`);
+		document.getElementById("loading-log").innerText = "fetched Приорбанк rate" ;
+		
+		
+		const urlT = `https://api.allorigins.win/get?url=${encodeURIComponent('https://myfin.by/bank/technobank/currency')}`;
+		document.getElementById("loading-log").innerText = "fetching " + urlT;
+		const rowT = 3;
+		const columnT = 1;
+		
+		let ruby = await getExchangeRate(urlT, rowT, columnT);
+		RubByn = ruby / 100.0;
+		console.log(`Технобанк rate is ${RubByn}`);
+		document.getElementById("RubByn").innerText = RubByn.toFixed(4);
+		document.getElementById("loading-log").innerText = "fetched Технобанк rate"
+		
+		
+		const urlM = 'https://mironline.ru/support/list/kursy_mir/';
+		document.getElementById("loading-log").innerText = "fetching " + urlM;
+		const rowM = 2;
+		const columnM = 1;
+		
+		mirRaw = await getExchangeRate(urlM, rowM, columnM);
+		MIR = 1.00 / mirRaw;
+		console.log(`MIR rate is ${mirRaw}`); // Output the resulting value to the console
+		document.getElementById("MIR").innerText = MIR.toFixed(4);
+		document.getElementById("loading-log").innerText = "fetched МИР rate"
+		
+		
+		
+		rateRubByn = RubByn;
+		BynEur = 1.0 / EurByn;
+		document.getElementById("BynEur").innerText = BynEur.toFixed(4);
+		
+		
+		console.log("loaded rates");
+		
+		// return EurByn, RubByn, MIR
+	}      
+	
+	async function Loading() {
+	console.log("loading screen");
+	  // show the loading screen
+	  var loadingContainer = document.getElementById("loading-container");
+	  loadingContainer.style.display = "flex";
+
+	  // your onload function here
+	  await getRates()
+
+	  // hide the loading screen
+	  loadingContainer.style.display = "none";
+	  calcEndRate()
+	  console.log("no loading screen");
+	};
+	
+
+	
+	function addComission(x) {
+		new_x = x * (1.00 + comission);
+		console.log(`RUB with commision is ${new_x}.`);
+		document.getElementById("with-comission").innerText = new_x.toLocaleString() ;
+	}
+	
+	
+	function calcEndRate() {
+		console.log("calculating end rate");
+		let BynRub = 1.0 / rateRubByn;
+		let rateRubEur = EurByn * BynRub;
+		document.getElementById("final-rate").innerText = rateRubEur.toFixed(4);
+	}
+	
+	function updateByRub() {
+		let rub = parseFloat(document.getElementById("rub").value);
+		byn = rub * rateRubByn;
+		eur = byn / EurByn ;
+		console.log(`BYN is ${byn} and EUR is ${eur}.`);
+		
+		document.getElementById("byn").value = byn.toFixed(2);
+		document.getElementById("eur").value = eur.toFixed(2);
+		
+		return rub
+	}
+	
+	function updateByByn() {
+		let byn = parseFloat(document.getElementById("byn").value);
+		rub = byn / rateRubByn;
+		eur = byn * BynEur;
+		console.log(`RUB is ${rub} and EUR is ${eur}.`);
+		
+		document.getElementById("rub").value = rub.toFixed(2);
+		document.getElementById("eur").value = eur.toFixed(2);
+		
+		return rub
+	}
+	
+	function updateByEur() {
+		let eur = parseFloat(document.getElementById("eur").value);
+		byn = eur * EurByn;
+		rub = byn / rateRubByn;
+		console.log(`RUB is ${rub} and BYN is ${byn}.`);
+
+		document.getElementById("rub").value = rub.toFixed(2);
+		document.getElementById("byn").value = byn.toFixed(2);
+		
+		return rub
+	}
+	
+	function updateCurr(curr) {
+		lastEntered = curr;
+		
+		let RUB = 0.0
+		if (curr === "rub") {
+			RUB = updateByRub();
+		}
+		else if (curr === "byn") {
+			RUB = updateByByn();
+		}
+		else if (curr === "eur") {
+			RUB = updateByEur();
+		}
+		
+		addComission(RUB);
+	}
+	
+	function updateRate() {
+		const myCheckbox = document.querySelector('#addition');
+		
+		console.log("updating values");
+		
+		if (myCheckbox.checked) {
+		  rateRubByn = MIR;
+		} else {
+		  rateRubByn = RubByn;
+		}
+		
+		if (lastEntered === "rub") {updateByRub();}
+		else if (lastEntered === "byn") {updateByByn();}
+		else if (lastEntered === "eur") {updateByEur();}
+		
+		calcEndRate()
+	}
+    </script>
+  </body>
+</html>
