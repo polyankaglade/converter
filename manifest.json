@@ -2,6 +2,7 @@
   "name": "Converter",
   "short_name": "Converter",
   "start_url": "index.html",
+  "scope": ".",
   "display": "standalone",
   "background_color": "#b0b0b0",
   "theme_color": "#b0b0b0",
